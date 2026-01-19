@@ -1,0 +1,121 @@
+export interface ImageMetadata {
+  cameraId: string;
+  location: string;
+  crossStreet: string;
+  direction: string;
+  timestamp: string;
+  s3Key: string;
+}
+
+export interface PlateDetectionResult {
+  plateNumber: string;
+  plateState?: string;
+  confidence: number;
+  rawTextractData: any;
+}
+
+export interface IceLookupResult {
+  found: boolean;
+  status?: 'Confirmed ICE' | 'Highly suspected ICE';
+  notes?: string;
+  plateIssuer?: string;
+  tags?: string[];
+}
+
+export interface VehicleAnalysis {
+  vehicleType: string;
+  tintLevel: 'none' | 'light' | 'moderate' | 'heavy';
+  occupantCount: number;
+  hasFaceMasks: boolean;
+  hasTacticalGear: boolean;
+  confidence: number;
+  rawBedrockData: any;
+}
+
+export interface RiskAssessment {
+  riskScore: number;
+  breakdown: { [key: string]: number };
+  action: 'auto_alert_main' | 'auto_alert_suspected' | 'alert_if_threshold' | 'no_alert';
+  iceStatus?: 'Confirmed ICE' | 'Highly suspected ICE';
+  reasoning: string;
+}
+
+export interface ProcessingResult {
+  sightingId: string;
+  plateNumber: string;
+  plateState?: string;
+  timestamp: string;
+  imageMetadata: ImageMetadata;
+  iceStatus?: 'Confirmed ICE' | 'Highly suspected ICE';
+  vehicleAnalysis?: VehicleAnalysis;
+  riskAssessment: RiskAssessment;
+  alertSent: boolean;
+  signalGroupType?: 'main' | 'suspected';
+  destinationFolder: 'confirmed' | 'standard';
+}
+
+export interface ConfirmedSighting {
+  plateNumber: string;
+  timestamp: string;
+  sightingId: string;
+  plateState?: string;
+  cameraId: string;
+  location: string;
+  crossStreet: string;
+  direction: string;
+  imageS3Key: string;
+  iceStatus: 'Confirmed ICE' | 'Highly suspected ICE';
+  textractConfidence: number;
+  iceReason: 'known_database' | 'tactical_gear' | 'multiple_conditions';
+  alertSent: boolean;
+  signalGroupType: 'main' | 'suspected';
+  ttl: number;
+}
+
+export interface StandardSighting {
+  plateNumber: string;
+  timestamp: string;
+  sightingId: string;
+  plateState?: string;
+  cameraId: string;
+  location: string;
+  crossStreet: string;
+  direction: string;
+  imageS3Key: string;
+  vehicleType: string;
+  tintLevel: string;
+  occupantCount: number;
+  hasFaceMasks: boolean;
+  hasTacticalGear: boolean;
+  riskScore: number;
+  alertSent: boolean;
+  rawTextractData: any;
+  rawBedrockData: any;
+  ttl: number;
+}
+
+export interface Vehicle {
+  plateNumber: string;
+  platePrefix: string;
+  state?: string;
+  isKnownSuspicious: boolean;
+  suspicionLevel: number;
+  notes?: string;
+  firstSeen: string;
+  lastSeen: string;
+  totalSightings: number;
+}
+
+export interface AlertMessage {
+  plateNumber: string;
+  plateState?: string;
+  location: string;
+  crossStreet: string;
+  direction: string;
+  timestamp: string;
+  riskScore: number;
+  iceStatus?: string;
+  reasoning: string;
+  imageS3Key: string;
+  groupType: 'main' | 'suspected';
+}

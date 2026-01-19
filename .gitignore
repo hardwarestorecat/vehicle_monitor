@@ -1,0 +1,48 @@
+*.js
+!jest.config.js
+*.d.ts
+node_modules
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# Build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# Environment
+.env
+.env.local
+
+# AWS
+.aws-sam/
+
+# Secrets
+*.pem
+*.key
+
+# Zone identifiers (Windows)
+*:Zone.Identifier
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
