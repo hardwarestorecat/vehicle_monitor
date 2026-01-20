@@ -39,6 +39,10 @@ Analyze this image and provide the following information in JSON format:
     "alternatives": ["<alternative reading 1>", "<alternative reading 2>"]
   },
   "vehicle": {
+    "make": "<vehicle manufacturer, e.g., Ford, Toyota, Chevrolet, or 'Unknown'>",
+    "model": "<vehicle model if identifiable, e.g., F-150, Tahoe, Camry, or 'Unknown'>",
+    "year": "<estimated year range, e.g., '2018-2022', or null if unknown>",
+    "color": "<primary vehicle color: white|black|silver|gray|blue|red|green|brown|yellow|other>",
     "vehicleType": "sedan|suv|truck|van|crossover|motorcycle|other",
     "tintLevel": "none|light|moderate|heavy",
     "occupantCount": <number of visible occupants>,
@@ -74,6 +78,14 @@ Example: If you see what could be "O12ABC", "012ABC", or "Q12ABC", provide:
 - alternatives: ["012ABC", "Q12ABC"]
 
 If all characters are CLEARLY readable with no ambiguity, set alternatives to an empty array []
+
+VEHICLE IDENTIFICATION:
+- Make: Identify the manufacturer based on visible badges, grille design, or distinctive features
+- Model: If you can identify the specific model (e.g., Tahoe, Suburban, Explorer, F-150), include it
+- Year: Provide an estimated range based on body style (e.g., "2015-2020", "2020-2024")
+- Color: Primary exterior color (if two-tone, use the dominant color)
+- If make/model cannot be determined with reasonable confidence, use "Unknown"
+- Common ICE vehicles: Chevrolet Tahoe/Suburban, Ford Explorer, Dodge Charger, Dodge Durango
 
 IMPORTANT VEHICLE ANALYSIS:
 - Be very careful with tactical gear detection - only mark true if you see actual tactical vests, body armor, helmets, or military-style equipment
@@ -145,7 +157,11 @@ Respond ONLY with valid JSON, no other text.`;
       if (alternatives.length > 0) {
         console.log(`  Alternatives: ${alternatives.join(', ')}`);
       }
-      console.log('  Vehicle analysis:', {
+      console.log('  Vehicle:', {
+        make: vehicle.make || 'Unknown',
+        model: vehicle.model || 'Unknown',
+        year: vehicle.year || 'Unknown',
+        color: vehicle.color || 'Unknown',
         type: vehicle.vehicleType,
         tint: vehicle.tintLevel,
         occupants: vehicle.occupantCount,
@@ -160,6 +176,12 @@ Respond ONLY with valid JSON, no other text.`;
         plateState: plateState ? plateState.toUpperCase() : null,
         plateConfidence: plateConfidence,
         alternativePlates: alternatives.map((alt: string) => alt.toUpperCase().replace(/[^A-Z0-9]/g, '')),
+
+        // Vehicle identification
+        make: vehicle.make || 'Unknown',
+        model: vehicle.model || 'Unknown',
+        year: vehicle.year || null,
+        color: vehicle.color || 'Unknown',
 
         // Vehicle data
         vehicleType: vehicle.vehicleType || 'unknown',
@@ -177,6 +199,10 @@ Respond ONLY with valid JSON, no other text.`;
         plateNumber: null,
         plateState: null,
         plateConfidence: 0,
+        make: 'Unknown',
+        model: 'Unknown',
+        year: null,
+        color: 'Unknown',
         vehicleType: 'unknown',
         tintLevel: 'none',
         occupantCount: 0,

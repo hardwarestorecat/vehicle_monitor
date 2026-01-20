@@ -30,6 +30,12 @@ export interface VehicleAnalysis {
   plateConfidence: number;
   alternativePlates?: string[]; // Up to 3 alternative readings for ambiguous characters
 
+  // Vehicle identification
+  make: string; // e.g., "Chevrolet", "Ford", "Unknown"
+  model: string; // e.g., "Tahoe", "F-150", "Unknown"
+  year: string | null; // e.g., "2018-2022" or null
+  color: string; // e.g., "black", "white", "silver"
+
   // Vehicle data
   vehicleType: string;
   tintLevel: 'none' | 'light' | 'moderate' | 'heavy';
@@ -72,6 +78,14 @@ export interface ConfirmedSighting {
   crossStreet: string;
   direction: string;
   imageS3Key: string;
+
+  // Vehicle identification
+  vehicleMake: string;
+  vehicleModel: string;
+  vehicleYear: string | null;
+  vehicleColor: string;
+  vehicleType: string;
+
   iceStatus: 'Confirmed ICE' | 'Highly suspected ICE';
   textractConfidence: number;
   iceReason: 'known_database' | 'tactical_gear' | 'multiple_conditions';
@@ -90,7 +104,14 @@ export interface StandardSighting {
   crossStreet: string;
   direction: string;
   imageS3Key: string;
+
+  // Vehicle identification
+  vehicleMake: string;
+  vehicleModel: string;
+  vehicleYear: string | null;
+  vehicleColor: string;
   vehicleType: string;
+
   tintLevel: string;
   occupantCount: number;
   hasFaceMasks: boolean;
@@ -106,6 +127,13 @@ export interface Vehicle {
   plateNumber: string;
   platePrefix: string;
   state?: string;
+
+  // Vehicle identification (most recent sighting)
+  lastKnownMake?: string;
+  lastKnownModel?: string;
+  lastKnownColor?: string;
+  lastKnownYear?: string;
+
   isKnownSuspicious: boolean;
   suspicionLevel: number;
   notes?: string;
