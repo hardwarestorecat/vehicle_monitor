@@ -9,6 +9,7 @@ import { DynamoDBService } from './services/dynamodb-service';
 import { AlertService } from './services/alert-service';
 import { ProcessingResult, ImageMetadata } from '../shared/types';
 import { APP_CONFIG } from '../../lib/config/constants';
+import { getCameraConfig } from '../../lib/config/camera-config';
 import { buildDateBasedS3Key, extractFilename } from '../shared/utils/date-utils';
 
 // Initialize services (reused across invocations)
@@ -222,15 +223,26 @@ async function extractMetadata(
   bucketName: string,
   s3Key: string
 ): Promise<ImageMetadata> {
-  // For now, extract from S3 key pattern or use defaults
-  // Format expected: incoming/cameraId/timestamp.jpg
+  // Extract camera ID from S3 key pattern
+  // Format expected: vehicle_monitoring/captured/incoming/cameraId/timestamp.jpg
+  // or: vehicle_monitoring/captured/incoming/timestamp.jpg (defaults to 'unknown')
   const parts = s3Key.split('/');
 
+  // Try to find camera ID in path
+  // If the path has more segments after 'incoming/', the next one is camera ID
+  const incomingIndex = parts.findIndex(p => p === 'incoming');
+  const cameraId = incomingIndex >= 0 && parts.length > incomingIndex + 1
+    ? parts[incomingIndex + 1].replace(/\.(jpg|jpeg|png)$/i, '') // Remove file extension if it's the filename
+    : 'unknown';
+
+  // Get camera configuration
+  const cameraConfig = getCameraConfig(cameraId);
+
   return {
-    cameraId: parts[1] || 'unknown',
-    location: 'Unknown Location',
-    crossStreet: 'Unknown Cross Street',
-    direction: 'Unknown Direction',
+    cameraId: cameraConfig.cameraId,
+    location: cameraConfig.location,
+    crossStreet: cameraConfig.crossStreet,
+    direction: cameraConfig.direction,
     timestamp: new Date().toISOString(),
     s3Key,
   };

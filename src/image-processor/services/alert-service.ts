@@ -46,9 +46,9 @@ export class AlertService {
     let body: string;
 
     if (riskAssessment.iceStatus === 'Confirmed ICE') {
-      // 🚨 RED ALERT - Confirmed ICE
+      // !!! RED ALERT - Confirmed ICE
       alertType = 'CONFIRMED_ICE';
-      emoji = '🚨';
+      emoji = '!!!';
       subject = `${emoji} CONFIRMED ICE VEHICLE DETECTED`;
       body = this.formatConfirmedIceAlert(result);
     } else if (riskAssessment.iceStatus === 'Highly suspected ICE') {
@@ -82,7 +82,7 @@ export class AlertService {
     const { plateNumber, plateState, riskAssessment, imageMetadata } = result;
 
     return `
-🚨 CONFIRMED ICE VEHICLE DETECTED 🚨
+!!! CONFIRMED ICE VEHICLE DETECTED !!!
 
 License Plate: ${plateNumber}${plateState ? ` (${plateState})` : ''}
 Status: CONFIRMED ICE
@@ -94,7 +94,7 @@ Time: ${new Date(imageMetadata.timestamp).toLocaleString('en-US', { timeZone: 'A
 
 Reason: ${riskAssessment.reasoning}
 
-⚠️ IMMEDIATE ACTION REQUIRED ⚠️
+!!! IMMEDIATE ACTION REQUIRED !!!
 `.trim();
   }
 
