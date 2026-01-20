@@ -9,6 +9,7 @@ cdk.out
 
 # Build output
 dist/
+lambda-package/
 
 # Logs
 *.log

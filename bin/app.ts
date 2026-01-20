@@ -31,20 +31,20 @@ const storageStack = new StorageStack(app, 'VehicleMonitoringStorageStack', {
 
 storageStack.addDependency(networkStack);
 
-// Phase 2: Image Processing (Priority) - Deploy after Phase 1
-// const imageProcessorStack = new ImageProcessorStack(app, 'VehicleMonitoringImageProcessorStack', {
-//   env,
-//   description: 'Image processing Lambda with Textract and Bedrock',
-//   vpc: networkStack.vpc,
-//   bucket: storageStack.bucket,
-//   confirmedSightingsTable: storageStack.confirmedSightingsTable,
-//   sightingsTable: storageStack.sightingsTable,
-//   vehiclesTable: storageStack.vehiclesTable,
-//   cameraCredentialsSecret: storageStack.cameraCredentialsSecret,
-// });
-//
-// imageProcessorStack.addDependency(networkStack);
-// imageProcessorStack.addDependency(storageStack);
+// Phase 2: Image Processing (Priority)
+const imageProcessorStack = new ImageProcessorStack(app, 'VehicleMonitoringImageProcessorStack', {
+  env,
+  description: 'Image processing Lambda with Textract and Bedrock',
+  vpc: networkStack.vpc,
+  bucket: storageStack.bucket,
+  confirmedSightingsTable: storageStack.confirmedSightingsTable,
+  sightingsTable: storageStack.sightingsTable,
+  vehiclesTable: storageStack.vehiclesTable,
+  cameraCredentialsSecret: storageStack.cameraCredentialsSecret,
+});
+
+imageProcessorStack.addDependency(networkStack);
+imageProcessorStack.addDependency(storageStack);
 
 // Phase 3: Signal Integration
 // const alertStack = new AlertStack(app, 'VehicleMonitoringAlertStack', {
@@ -71,16 +71,16 @@ storageStack.addDependency(networkStack);
 // streamProcessorStack.addDependency(storageStack);
 
 // Phase 5: Monitoring
-// const monitoringStack = new MonitoringStack(app, 'VehicleMonitoringMonitoringStack', {
-//   env,
-//   description: 'CloudWatch dashboards and alarms',
-//   imageProcessorFunction: imageProcessorStack.imageProcessorFunction,
-//   bucket: storageStack.bucket,
-//   confirmedSightingsTable: storageStack.confirmedSightingsTable,
-//   sightingsTable: storageStack.sightingsTable,
-// });
-//
-// monitoringStack.addDependency(imageProcessorStack);
-// monitoringStack.addDependency(storageStack);
+const monitoringStack = new MonitoringStack(app, 'VehicleMonitoringMonitoringStack', {
+  env,
+  description: 'CloudWatch dashboards and alarms',
+  imageProcessorFunction: imageProcessorStack.imageProcessorFunction,
+  bucket: storageStack.bucket,
+  confirmedSightingsTable: storageStack.confirmedSightingsTable,
+  sightingsTable: storageStack.sightingsTable,
+});
+
+monitoringStack.addDependency(imageProcessorStack);
+monitoringStack.addDependency(storageStack);
 
 app.synth();

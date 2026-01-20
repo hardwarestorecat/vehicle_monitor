@@ -29,15 +29,7 @@ export class ImageProcessorStack extends cdk.Stack {
     this.imageProcessorFunction = new lambda.Function(this, 'ImageProcessorFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../../src/image-processor'), {
-        bundling: {
-          image: lambda.Runtime.NODEJS_20_X.bundlingImage,
-          command: [
-            'bash', '-c',
-            'cp -r . /asset-output/'
-          ],
-        },
-      }),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-package/image-processor')),
       timeout: cdk.Duration.seconds(APP_CONFIG.lambda.timeout),
       memorySize: APP_CONFIG.lambda.memorySize,
       reservedConcurrentExecutions: APP_CONFIG.lambda.reservedConcurrency,
