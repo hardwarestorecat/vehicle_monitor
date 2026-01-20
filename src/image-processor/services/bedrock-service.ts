@@ -121,7 +121,13 @@ Respond ONLY with valid JSON, no other text.`;
       console.log(`Bedrock analysis completed in ${processingTime}ms`);
 
       // Parse the response
-      const analysisText = responseBody.content[0].text;
+      let analysisText = responseBody.content[0].text;
+
+      // Strip code blocks if present (```json ... ```)
+      if (analysisText.includes('```')) {
+        analysisText = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+      }
+
       const analysis = JSON.parse(analysisText);
 
       // Extract license plate info

@@ -6,6 +6,7 @@ import { TextractService } from './services/textract-service';
 import { BedrockService } from './services/bedrock-service';
 import { RiskScorer } from './services/risk-scorer';
 import { DynamoDBService } from './services/dynamodb-service';
+import { AlertService } from './services/alert-service';
 import { ProcessingResult, ImageMetadata } from '../shared/types';
 import { APP_CONFIG } from '../../lib/config/constants';
 import { buildDateBasedS3Key, extractFilename } from '../shared/utils/date-utils';
@@ -28,6 +29,7 @@ const dynamoDBService = new DynamoDBService(
   APP_CONFIG.ttl.confirmedSightings,
   APP_CONFIG.ttl.sightings
 );
+const alertService = new AlertService();
 const s3Client = new S3Client({});
 
 // Load ICE database on cold start
@@ -134,10 +136,8 @@ async function processImage(record: S3EventRecord): Promise<void> {
     // Move image to /confirmed/ folder
     await moveToDestinationFolder(bucketName, s3Key, 'confirmed', plateNumber);
 
-    // TODO: Send Signal alert (Phase 3)
-    console.log(
-      `TODO: Send alert to ${result.signalGroupType} group for ${plateNumber}`
-    );
+    // Send Signal alert
+    await alertService.sendAlert(result);
 
     console.log(`Confirmed ICE processing complete: ${plateNumber}`);
     return;
@@ -210,11 +210,9 @@ async function processImage(record: S3EventRecord): Promise<void> {
     plateNumber
   );
 
-  // TODO: Send alert if needed (Phase 3)
+  // Send alert if needed
   if (riskAssessment.action !== 'no_alert') {
-    console.log(
-      `TODO: Send alert to ${result.signalGroupType} group for ${plateNumber}`
-    );
+    await alertService.sendAlert(result);
   }
 
   console.log(`Processing complete: ${plateNumber}`);

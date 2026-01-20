@@ -47,16 +47,16 @@ imageProcessorStack.addDependency(networkStack);
 imageProcessorStack.addDependency(storageStack);
 
 // Phase 3: Signal Integration
-// const alertStack = new AlertStack(app, 'VehicleMonitoringAlertStack', {
-//   env,
-//   description: 'Signal API service for sending alerts',
-//   vpc: networkStack.vpc,
-//   fileSystem: storageStack.fileSystem,
-//   signalCredentialsSecret: storageStack.signalCredentialsSecret,
-// });
-//
-// alertStack.addDependency(networkStack);
-// alertStack.addDependency(storageStack);
+const alertStack = new AlertStack(app, 'VehicleMonitoringAlertStack', {
+  env,
+  description: 'Signal API service for sending alerts',
+  vpc: networkStack.vpc,
+  fileSystem: storageStack.fileSystem,
+  signalCredentialsSecret: storageStack.signalCredentialsSecret,
+});
+
+alertStack.addDependency(networkStack);
+alertStack.addDependency(storageStack);
 
 // Phase 4: Stream Capture (deploy when cameras arrive)
 // const streamProcessorStack = new StreamProcessorStack(app, 'VehicleMonitoringStreamProcessorStack', {
