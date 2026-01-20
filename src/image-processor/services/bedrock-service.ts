@@ -35,7 +35,8 @@ Analyze this image and provide the following information in JSON format:
   "licensePlate": {
     "plateNumber": "<the license plate text, uppercase, no spaces or dashes>",
     "state": "<2-letter state code if visible, or null>",
-    "confidence": <0-100, your confidence in the plate reading>
+    "confidence": <0-100, your confidence in the plate reading>,
+    "alternatives": ["<alternative reading 1>", "<alternative reading 2>"]
   },
   "vehicle": {
     "vehicleType": "sedan|suv|truck|van|crossover|motorcycle|other",
@@ -54,6 +55,26 @@ IMPORTANT LICENSE PLATE EXTRACTION:
 - If you can see the state abbreviation or state name on the plate, include it
 - If no license plate is visible, set plateNumber to null
 
+CRITICAL - AMBIGUOUS CHARACTERS:
+Some characters look similar and can be confused. When ANY character is unclear or could be read multiple ways, provide up to 2 alternative readings in the "alternatives" array:
+- S vs 5 (SXH646 vs 5XH646)
+- O vs 0 (O12ABC vs 012ABC)
+- I vs 1 (I23XYZ vs 123XYZ)
+- B vs 8 (B7A123 vs 87A123)
+- Z vs 2 (Z9X456 vs 29X456)
+- G vs 6 (G8H123 vs 68H123)
+- Q vs 0 (Q5T789 vs 05T789)
+
+Example: If you see what could be "SXH646" or "5XH646", provide:
+- plateNumber: "5XH646" (your best guess)
+- alternatives: ["SXH646"]
+
+Example: If you see what could be "O12ABC", "012ABC", or "Q12ABC", provide:
+- plateNumber: "O12ABC" (your best guess)
+- alternatives: ["012ABC", "Q12ABC"]
+
+If all characters are CLEARLY readable with no ambiguity, set alternatives to an empty array []
+
 IMPORTANT VEHICLE ANALYSIS:
 - Be very careful with tactical gear detection - only mark true if you see actual tactical vests, body armor, helmets, or military-style equipment
 - Face masks include medical masks, gators, balaclavas, or any face coverings
@@ -62,8 +83,8 @@ IMPORTANT VEHICLE ANALYSIS:
 
 Respond ONLY with valid JSON, no other text.`;
 
-      // Call Bedrock (using cross-region inference profile)
-      const modelId = 'us.anthropic.claude-3-haiku-20240307-v1:0';
+      // Call Bedrock (using cross-region inference profile for Haiku 4.5)
+      const modelId = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
       const command = new InvokeModelCommand({
         modelId,
         contentType: 'application/json',
@@ -108,12 +129,16 @@ Respond ONLY with valid JSON, no other text.`;
       const plateNumber = licensePlate.plateNumber;
       const plateState = licensePlate.state;
       const plateConfidence = licensePlate.confidence || 0;
+      const alternatives = licensePlate.alternatives || [];
 
       // Extract vehicle info
       const vehicle = analysis.vehicle || {};
 
       console.log('Bedrock extraction results:');
       console.log(`  License Plate: ${plateNumber || 'NOT DETECTED'} (${plateState || 'unknown state'}) - Confidence: ${plateConfidence}%`);
+      if (alternatives.length > 0) {
+        console.log(`  Alternatives: ${alternatives.join(', ')}`);
+      }
       console.log('  Vehicle analysis:', {
         type: vehicle.vehicleType,
         tint: vehicle.tintLevel,
@@ -128,6 +153,7 @@ Respond ONLY with valid JSON, no other text.`;
         plateNumber: plateNumber ? plateNumber.toUpperCase().replace(/[^A-Z0-9]/g, '') : null,
         plateState: plateState ? plateState.toUpperCase() : null,
         plateConfidence: plateConfidence,
+        alternativePlates: alternatives.map((alt: string) => alt.toUpperCase().replace(/[^A-Z0-9]/g, '')),
 
         // Vehicle data
         vehicleType: vehicle.vehicleType || 'unknown',

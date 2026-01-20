@@ -75,17 +75,29 @@ async function processImage(record: S3EventRecord): Promise<void> {
     return;
   }
 
-  const plateNumber = analysis.plateNumber;
+  let plateNumber = analysis.plateNumber;
   const plateState = analysis.plateState || undefined;
   const confidence = analysis.plateConfidence;
+  const alternatives = analysis.alternativePlates || [];
 
   console.log(`Detected plate: ${plateNumber} (${plateState || 'unknown state'}) - Confidence: ${confidence}%`);
+  if (alternatives.length > 0) {
+    console.log(`  Alternative readings: ${alternatives.join(', ')}`);
+  }
 
   // Step 2: Check ICE database (PRIORITY #1)
-  const iceLookup = await iceLookupService.lookupPlate(plateNumber);
+  // Build array of all plates to check: [primary, ...alternatives]
+  const platesToCheck = [plateNumber, ...alternatives];
+  const iceLookup = await iceLookupService.lookupMultiplePlates(platesToCheck);
 
   if (iceLookup.found) {
-    console.log(`ALERT: Plate found in ICE database - Status: ${iceLookup.status}`);
+    // If an alternative matched, use that as the official plate number
+    if (iceLookup.matchedPlate && iceLookup.matchedPlate !== plateNumber) {
+      console.log(`ALERT: Alternative plate "${iceLookup.matchedPlate}" matched in ICE database (original: "${plateNumber}")`);
+      plateNumber = iceLookup.matchedPlate; // Use the matched alternative
+    } else {
+      console.log(`ALERT: Plate found in ICE database - Status: ${iceLookup.status}`);
+    }
 
     // Process as confirmed/suspected ICE without Bedrock analysis
     const result: ProcessingResult = {

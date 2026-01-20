@@ -2,7 +2,7 @@
 set -e
 
 export AWS_PROFILE=hardwarestorecat
-BUCKET="vehicle-monitoring-captured-frames-770171147232"
+BUCKET="vehicle-monitoring-770171147232"
 REGION="us-east-2"
 FUNCTION="VehicleMonitoringImagePro-ImageProcessorFunction11-6fGYR0wfk8ow"
 SAMPLE_DIR="bin/sample_photos"
@@ -12,7 +12,7 @@ echo "  Vehicle License Plate Monitoring - Sample Photos Test"
 echo "========================================================================"
 echo ""
 echo "Testing all sample photos to verify:"
-echo "  ✓ License plate detection (Textract)"
+echo "  ✓ License plate detection (Claude via Bedrock)"
 echo "  ✓ ICE database lookup"
 echo "  ✓ Vehicle classification (Bedrock)"
 echo "  ✓ Risk scoring"

@@ -20,6 +20,7 @@ export interface IceLookupResult {
   notes?: string;
   plateIssuer?: string;
   tags?: string[];
+  matchedPlate?: string; // Which plate variation matched (for ambiguous character handling)
 }
 
 export interface VehicleAnalysis {
@@ -27,6 +28,7 @@ export interface VehicleAnalysis {
   plateNumber: string | null;
   plateState: string | null;
   plateConfidence: number;
+  alternativePlates?: string[]; // Up to 3 alternative readings for ambiguous characters
 
   // Vehicle data
   vehicleType: string;

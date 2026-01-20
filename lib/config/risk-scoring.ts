@@ -1,6 +1,6 @@
 export const RISK_SCORING = {
   // Alert Threshold
-  alertThreshold: 50,
+  alertThreshold: 70,
 
   // Point-Based Scoring
   points: {

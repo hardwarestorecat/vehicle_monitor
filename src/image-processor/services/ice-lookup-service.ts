@@ -99,6 +99,39 @@ export class IceLookupService {
   }
 
   /**
+   * Lookup multiple license plate variations (for ambiguous character handling)
+   * Returns the first match found, or not found if none match
+   */
+  async lookupMultiplePlates(plateNumbers: string[]): Promise<IceLookupResult & { matchedPlate?: string }> {
+    // Ensure database is loaded
+    if (!this.icePlatesMap) {
+      await this.loadIcePlatesDatabase();
+    }
+
+    // Try each plate variation in order
+    for (const plateNumber of plateNumbers) {
+      const normalizedPlate = plateNumber.toUpperCase().trim();
+      const entry = this.icePlatesMap!.get(normalizedPlate);
+
+      if (entry) {
+        console.log(`ICE database match found: ${normalizedPlate} (from alternatives: ${plateNumbers.join(', ')})`);
+        return {
+          found: true,
+          status: entry.status,
+          plateIssuer: entry.plateIssuer,
+          tags: entry.tags,
+          notes: entry.notes,
+          matchedPlate: normalizedPlate, // Which alternative matched
+        };
+      }
+    }
+
+    return {
+      found: false,
+    };
+  }
+
+  /**
    * Check if database is loaded
    */
   isLoaded(): boolean {
