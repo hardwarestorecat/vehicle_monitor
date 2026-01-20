@@ -31,14 +31,15 @@ export class StorageStack extends cdk.Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       lifecycleRules: [
+        // Old prefix rules (keep for compatibility)
         {
           id: 'DeleteIncomingAfter1Day',
-          prefix: APP_CONFIG.s3Prefixes.incoming,
+          prefix: (APP_CONFIG.s3Prefixes as any).oldIncoming,
           expiration: cdk.Duration.days(APP_CONFIG.lifecycle.incomingDeleteDays),
         },
         {
           id: 'ConfirmedGlacierTransition',
-          prefix: APP_CONFIG.s3Prefixes.confirmed,
+          prefix: (APP_CONFIG.s3Prefixes as any).oldConfirmed,
           transitions: [
             {
               storageClass: s3.StorageClass.GLACIER,
@@ -49,6 +50,34 @@ export class StorageStack extends cdk.Stack {
         },
         {
           id: 'StandardGlacierTransition',
+          prefix: (APP_CONFIG.s3Prefixes as any).oldStandard,
+          transitions: [
+            {
+              storageClass: s3.StorageClass.GLACIER,
+              transitionAfter: cdk.Duration.days(APP_CONFIG.lifecycle.standardGlacierDays),
+            },
+          ],
+          expiration: cdk.Duration.days(APP_CONFIG.lifecycle.standardDeleteDays),
+        },
+        // New prefix rules (date-based folder structure)
+        {
+          id: 'DeleteNewIncomingAfter1Day',
+          prefix: APP_CONFIG.s3Prefixes.incoming,
+          expiration: cdk.Duration.days(APP_CONFIG.lifecycle.incomingDeleteDays),
+        },
+        {
+          id: 'NewConfirmedGlacierTransition',
+          prefix: APP_CONFIG.s3Prefixes.confirmed,
+          transitions: [
+            {
+              storageClass: s3.StorageClass.GLACIER,
+              transitionAfter: cdk.Duration.days(APP_CONFIG.lifecycle.confirmedGlacierDays),
+            },
+          ],
+          expiration: cdk.Duration.days(APP_CONFIG.lifecycle.confirmedDeleteDays),
+        },
+        {
+          id: 'NewStandardGlacierTransition',
           prefix: APP_CONFIG.s3Prefixes.standard,
           transitions: [
             {

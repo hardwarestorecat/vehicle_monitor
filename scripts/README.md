@@ -18,7 +18,7 @@ Or if the CSV is already in the project directory:
 
 This script will:
 1. ✅ Convert CSV to JSON format
-2. ✅ Upload to S3 (`config/ice-plates.json`)
+2. ✅ Upload to S3 (`vehicle_monitoring/assets/ice-plates.json`)
 3. ✅ Show statistics (total plates, confirmed, suspected)
 
 The Lambda function will automatically load the new database on its next cold start (usually within a few minutes).
@@ -43,7 +43,7 @@ Output: Creates `ice-plates.json` in project root
 ```bash
 export AWS_PROFILE=hardwarestorecat
 aws s3 cp ice-plates.json \
-  s3://vehicle-monitoring-captured-frames-770171147232/config/ice-plates.json \
+  s3://vehicle-monitoring-captured-frames-770171147232/vehicle_monitoring/assets/ice-plates.json \
   --region us-east-2
 ```
 

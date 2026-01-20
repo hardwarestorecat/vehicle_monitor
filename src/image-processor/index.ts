@@ -8,6 +8,7 @@ import { RiskScorer } from './services/risk-scorer';
 import { DynamoDBService } from './services/dynamodb-service';
 import { ProcessingResult, ImageMetadata } from '../shared/types';
 import { APP_CONFIG } from '../../lib/config/constants';
+import { buildDateBasedS3Key, extractFilename } from '../shared/utils/date-utils';
 
 // Initialize services (reused across invocations)
 const iceLookupService = new IceLookupService(
@@ -244,7 +245,16 @@ async function moveToDestinationFolder(
   plateNumber: string
 ): Promise<void> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const destinationKey = `${folder}/${plateNumber}_${timestamp}.jpg`;
+  const filename = `${plateNumber}_${timestamp}.jpg`;
+
+  // Get the appropriate S3 prefix for the folder type
+  const prefix = folder === 'confirmed'
+    ? APP_CONFIG.s3Prefixes.confirmed
+    : APP_CONFIG.s3Prefixes.standard;
+
+  // Build destination key with date-based folder structure
+  // Example: vehicle_monitoring/captured/confirmed/2026-01-19/ABC123_2026-01-19T12-00-00-000Z.jpg
+  const destinationKey = buildDateBasedS3Key(prefix, filename);
 
   console.log(`Moving image from ${sourceKey} to ${destinationKey}`);
 

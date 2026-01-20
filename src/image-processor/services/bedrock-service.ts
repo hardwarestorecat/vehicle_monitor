@@ -47,8 +47,8 @@ IMPORTANT:
 
 Respond ONLY with valid JSON, no other text.`;
 
-      // Call Bedrock
-      const modelId = 'anthropic.claude-3-haiku-20240307-v1:0';
+      // Call Bedrock (using cross-region inference profile)
+      const modelId = 'us.anthropic.claude-3-haiku-20240307-v1:0';
       const command = new InvokeModelCommand({
         modelId,
         contentType: 'application/json',

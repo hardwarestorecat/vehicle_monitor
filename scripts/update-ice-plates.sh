@@ -39,7 +39,7 @@ echo ""
 # Upload to S3
 echo "☁️  Uploading to S3..."
 export AWS_PROFILE=hardwarestorecat
-aws s3 cp ice-plates.json s3://vehicle-monitoring-captured-frames-770171147232/config/ice-plates.json --region us-east-2
+aws s3 cp ice-plates.json s3://vehicle-monitoring-captured-frames-770171147232/vehicle_monitoring/assets/ice-plates.json --region us-east-2
 
 echo ""
 echo "================================================"

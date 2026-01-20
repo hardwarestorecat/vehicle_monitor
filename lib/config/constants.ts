@@ -10,14 +10,21 @@ export const APP_CONFIG = {
   // S3 Configuration
   bucketName: 'vehicle-monitoring-captured-frames',
   s3Prefixes: {
-    incoming: 'incoming/',
-    confirmed: 'confirmed/',
-    standard: 'standard/',
-    config: 'config/',
+    incoming: 'vehicle_monitoring/captured/incoming/',
+    confirmed: 'vehicle_monitoring/captured/confirmed/',
+    standard: 'vehicle_monitoring/captured/standard/',
+    assets: 'vehicle_monitoring/assets/',
+    // Keep old prefixes for lifecycle rules (gradual migration)
+    oldIncoming: 'incoming/',
+    oldConfirmed: 'confirmed/',
+    oldStandard: 'standard/',
   },
 
   // ICE Database
-  icePlatesConfigKey: 'config/ice-plates.json',
+  icePlatesConfigKey: 'vehicle_monitoring/assets/ice-plates.json',
+
+  // Timezone (for date-based folder organization)
+  timezone: 'America/Chicago',
 
   // DynamoDB Tables
   tables: {

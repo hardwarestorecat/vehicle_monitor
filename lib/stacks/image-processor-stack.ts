@@ -28,7 +28,7 @@ export class ImageProcessorStack extends cdk.Stack {
     // Lambda function for image processing
     this.imageProcessorFunction = new lambda.Function(this, 'ImageProcessorFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
+      handler: 'src/image-processor/index.handler',
       code: lambda.Code.fromAsset(path.join(__dirname, '../../lambda-package/image-processor')),
       timeout: cdk.Duration.seconds(APP_CONFIG.lambda.timeout),
       memorySize: APP_CONFIG.lambda.memorySize,
@@ -60,12 +60,17 @@ export class ImageProcessorStack extends cdk.Stack {
       resources: ['*'],
     }));
 
-    // Grant Bedrock permissions
+    // Grant Bedrock permissions (for inference profiles and models)
     this.imageProcessorFunction.addToRolePolicy(new iam.PolicyStatement({
       actions: [
         'bedrock:InvokeModel',
       ],
       resources: [
+        // Allow access to cross-region inference profiles (us-east-2)
+        `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
+        // Allow access to foundation models in us-east-1 (where inference profiles route)
+        `arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
+        // Also allow direct model access in current region
         `arn:aws:bedrock:${this.region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`,
       ],
     }));

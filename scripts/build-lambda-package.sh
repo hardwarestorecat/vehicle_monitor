@@ -7,11 +7,13 @@ echo "Building Lambda deployment package..."
 rm -rf lambda-package
 mkdir -p lambda-package/image-processor
 
-# Copy compiled JavaScript files
+# Copy compiled JavaScript files with correct directory structure
 echo "Copying compiled code..."
-cp -r dist/src/image-processor/* lambda-package/image-processor/
-cp -r dist/src/shared lambda-package/
-cp -r dist/lib lambda-package/
+# Create nested structure to maintain relative import paths
+mkdir -p lambda-package/image-processor/src/image-processor
+cp -r dist/src/image-processor/* lambda-package/image-processor/src/image-processor/
+cp -r dist/src/shared lambda-package/image-processor/src/shared
+cp -r dist/lib lambda-package/image-processor/lib
 
 # Create package.json for Lambda
 cat > lambda-package/image-processor/package.json <<EOF
