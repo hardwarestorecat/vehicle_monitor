@@ -25,71 +25,12 @@ export class StorageStack extends cdk.Stack {
     super(scope, id, props);
 
     // S3 Bucket for captured frames
-    this.bucket = new s3.Bucket(this, 'CapturedFramesBucket', {
-      bucketName: `${APP_CONFIG.bucketName}-${APP_CONFIG.account}`,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      lifecycleRules: [
-        // Old prefix rules (keep for compatibility)
-        {
-          id: 'DeleteIncomingAfter1Day',
-          prefix: (APP_CONFIG.s3Prefixes as any).oldIncoming,
-          expiration: cdk.Duration.days(APP_CONFIG.lifecycle.incomingDeleteDays),
-        },
-        {
-          id: 'ConfirmedGlacierTransition',
-          prefix: (APP_CONFIG.s3Prefixes as any).oldConfirmed,
-          transitions: [
-            {
-              storageClass: s3.StorageClass.GLACIER,
-              transitionAfter: cdk.Duration.days(APP_CONFIG.lifecycle.confirmedGlacierDays),
-            },
-          ],
-          expiration: cdk.Duration.days(APP_CONFIG.lifecycle.confirmedDeleteDays),
-        },
-        {
-          id: 'StandardGlacierTransition',
-          prefix: (APP_CONFIG.s3Prefixes as any).oldStandard,
-          transitions: [
-            {
-              storageClass: s3.StorageClass.GLACIER,
-              transitionAfter: cdk.Duration.days(APP_CONFIG.lifecycle.standardGlacierDays),
-            },
-          ],
-          expiration: cdk.Duration.days(APP_CONFIG.lifecycle.standardDeleteDays),
-        },
-        // New prefix rules (date-based folder structure)
-        {
-          id: 'DeleteNewIncomingAfter1Day',
-          prefix: APP_CONFIG.s3Prefixes.incoming,
-          expiration: cdk.Duration.days(APP_CONFIG.lifecycle.incomingDeleteDays),
-        },
-        {
-          id: 'NewConfirmedGlacierTransition',
-          prefix: APP_CONFIG.s3Prefixes.confirmed,
-          transitions: [
-            {
-              storageClass: s3.StorageClass.GLACIER,
-              transitionAfter: cdk.Duration.days(APP_CONFIG.lifecycle.confirmedGlacierDays),
-            },
-          ],
-          expiration: cdk.Duration.days(APP_CONFIG.lifecycle.confirmedDeleteDays),
-        },
-        {
-          id: 'NewStandardGlacierTransition',
-          prefix: APP_CONFIG.s3Prefixes.standard,
-          transitions: [
-            {
-              storageClass: s3.StorageClass.GLACIER,
-              transitionAfter: cdk.Duration.days(APP_CONFIG.lifecycle.standardGlacierDays),
-            },
-          ],
-          expiration: cdk.Duration.days(APP_CONFIG.lifecycle.standardDeleteDays),
-        },
-      ],
-      eventBridgeEnabled: true, // For S3 event notifications
-    });
+    // Import existing bucket instead of creating new one
+    const bucketName = `${APP_CONFIG.bucketName}-${APP_CONFIG.account}`;
+    this.bucket = s3.Bucket.fromBucketName(this, 'CapturedFramesBucket', bucketName) as s3.Bucket;
+
+    // NOTE: Lifecycle rules cannot be managed on imported buckets.
+    // Configure lifecycle rules manually via AWS Console or CLI if needed.
 
     // DynamoDB Table: confirmed_sightings (High Priority - Confirmed/Suspected ICE)
     this.confirmedSightingsTable = new dynamodb.Table(this, 'ConfirmedSightingsTable', {
@@ -214,9 +155,11 @@ export class StorageStack extends cdk.Stack {
     });
 
     // EFS for Signal state (only create if VPC provided)
+    // Note: Mount targets are in public subnets (managed outside CDK)
     if (props?.vpc && props?.efsSecurityGroup) {
       this.fileSystem = new efs.FileSystem(this, 'SignalStateFileSystem', {
         vpc: props.vpc,
+        // Don't specify vpcSubnets - mount targets are managed manually
         encrypted: true,
         lifecyclePolicy: efs.LifecyclePolicy.AFTER_7_DAYS,
         performanceMode: efs.PerformanceMode.GENERAL_PURPOSE,

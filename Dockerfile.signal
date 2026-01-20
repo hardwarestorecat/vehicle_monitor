@@ -1,0 +1,94 @@
+# Use the signal-cli-rest-api base image
+FROM bbernhard/signal-cli-rest-api:latest
+
+# Install AWS Lambda Runtime Interface Client for custom runtime
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    curl
+
+# Install AWS Lambda RIE
+RUN pip3 install awslambdaric
+
+# Set the signal-cli data directory to use EFS mount
+ENV SIGNAL_CLI_CONFIG_DIR=/mnt/efs/signal-cli
+
+# Create entrypoint script for Lambda
+RUN cat > /lambda-entrypoint.sh <<'EOF'
+#!/bin/sh
+# Start signal-cli-rest-api in background
+/entrypoint.sh &
+API_PID=$!
+
+# Wait for API to be ready
+sleep 5
+
+# Lambda runtime handler - forwards requests to signal-cli REST API
+python3 -m awslambdaric lambda_function.handler
+
+# Cleanup
+kill $API_PID 2>/dev/null || true
+EOF
+
+# Create Lambda handler that proxies to local signal-cli REST API
+RUN cat > /lambda_function.py <<'EOF'
+import json
+import urllib.request
+import urllib.error
+
+def handler(event, context):
+    """
+    Lambda handler that proxies HTTP requests to signal-cli-rest-api
+    """
+    try:
+        # Extract request details from Lambda Function URL event
+        http_method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
+        path = event.get('rawPath', '/')
+        query_string = event.get('rawQueryString', '')
+        headers = event.get('headers', {})
+        body = event.get('body', '')
+
+        # Build full URL to local signal-cli API
+        url = f"http://localhost:8080{path}"
+        if query_string:
+            url += f"?{query_string}"
+
+        # Create request
+        req = urllib.request.Request(url, method=http_method)
+
+        # Forward headers (except host)
+        for key, value in headers.items():
+            if key.lower() not in ['host', 'content-length']:
+                req.add_header(key, value)
+
+        # Add body for POST/PUT requests
+        if body and http_method in ['POST', 'PUT', 'PATCH']:
+            req.data = body.encode('utf-8')
+            req.add_header('Content-Type', headers.get('content-type', 'application/json'))
+
+        # Make request to signal-cli API
+        with urllib.request.urlopen(req, timeout=30) as response:
+            response_body = response.read().decode('utf-8')
+            return {
+                'statusCode': response.status,
+                'headers': {
+                    'Content-Type': response.headers.get('Content-Type', 'application/json')
+                },
+                'body': response_body
+            }
+
+    except urllib.error.HTTPError as e:
+        return {
+            'statusCode': e.code,
+            'body': json.dumps({'error': str(e.reason)})
+        }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
+EOF
+
+RUN chmod +x /lambda-entrypoint.sh
+
+ENTRYPOINT ["/lambda-entrypoint.sh"]

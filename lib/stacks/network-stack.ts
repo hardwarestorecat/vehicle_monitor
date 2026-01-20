@@ -15,7 +15,7 @@ export class NetworkStack extends cdk.Stack {
     // Create VPC with public and private subnets
     this.vpc = new ec2.Vpc(this, 'VehicleMonitoringVPC', {
       maxAzs: 2,
-      natGateways: 0, // Use VPC endpoints instead to save costs
+      natGateways: 0, // No NAT Gateway - ECS tasks use public subnets
       subnetConfiguration: [
         {
           cidrMask: 24,
@@ -88,6 +88,13 @@ export class NetworkStack extends cdk.Stack {
       'Allow Lambda to call Signal API'
     );
 
+    // Allow ALB to health check ECS tasks
+    this.ecsSecurityGroup.addIngressRule(
+      this.albSecurityGroup,
+      ec2.Port.tcp(8080),
+      'Allow ALB to health check ECS containers'
+    );
+
     // EFS Security Group
     this.efsSecurityGroup = new ec2.SecurityGroup(this, 'EFSSecurityGroup', {
       vpc: this.vpc,
@@ -100,6 +107,20 @@ export class NetworkStack extends cdk.Stack {
       this.ecsSecurityGroup,
       ec2.Port.tcp(2049),
       'Allow ECS to mount EFS'
+    );
+
+    // Allow Lambda to mount EFS
+    this.efsSecurityGroup.addIngressRule(
+      this.lambdaSecurityGroup,
+      ec2.Port.tcp(2049),
+      'Allow Lambda to mount EFS'
+    );
+
+    // Allow all VPC traffic to EFS (for Fargate tasks in public subnets)
+    this.efsSecurityGroup.addIngressRule(
+      ec2.Peer.ipv4(this.vpc.vpcCidrBlock),
+      ec2.Port.tcp(2049),
+      'Allow VPC to mount EFS'
     );
 
     // Outputs

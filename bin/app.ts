@@ -49,10 +49,11 @@ imageProcessorStack.addDependency(storageStack);
 // Phase 3: Signal Integration
 const alertStack = new AlertStack(app, 'VehicleMonitoringAlertStack', {
   env,
-  description: 'Signal API service for sending alerts',
+  description: 'Signal API Lambda function for sending alerts',
   vpc: networkStack.vpc,
   fileSystem: storageStack.fileSystem,
   signalCredentialsSecret: storageStack.signalCredentialsSecret,
+  lambdaSecurityGroup: networkStack.lambdaSecurityGroup,
 });
 
 alertStack.addDependency(networkStack);
