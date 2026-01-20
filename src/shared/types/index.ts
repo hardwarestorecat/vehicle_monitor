@@ -23,6 +23,12 @@ export interface IceLookupResult {
 }
 
 export interface VehicleAnalysis {
+  // License plate data (extracted by Bedrock)
+  plateNumber: string | null;
+  plateState: string | null;
+  plateConfidence: number;
+
+  // Vehicle data
   vehicleType: string;
   tintLevel: 'none' | 'light' | 'moderate' | 'heavy';
   occupantCount: number;

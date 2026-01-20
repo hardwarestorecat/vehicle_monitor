@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   adjacentStates: ['WI', 'IA', 'SD', 'ND'],
 
   // S3 Configuration
-  bucketName: 'vehicle-monitoring-captured-frames',
+  bucketName: 'vehicle-monitoring',
   s3Prefixes: {
     incoming: 'vehicle_monitoring/captured/incoming/',
     confirmed: 'vehicle_monitoring/captured/confirmed/',

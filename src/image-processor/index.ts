@@ -63,18 +63,23 @@ async function processImage(record: S3EventRecord): Promise<void> {
   // Extract metadata from S3 key or object metadata
   const imageMetadata = await extractMetadata(bucketName, s3Key);
 
-  // Step 1: Extract license plate with Textract
-  const plateResult = await textractService.extractPlateFromImage(bucketName, s3Key);
+  // Step 1: Use Bedrock to extract license plate AND analyze vehicle (single call)
+  // This replaces Textract - much more accurate and cheaper!
+  const analysis = await bedrockService.classifyVehicle(bucketName, s3Key);
 
-  if (!plateResult) {
-    console.log('No license plate detected - skipping image');
+  // Check if license plate was detected
+  if (!analysis.plateNumber) {
+    console.log('No license plate detected by Bedrock - skipping image');
     // Delete from /incoming/ since we can't process it
     await deleteFromIncoming(bucketName, s3Key);
     return;
   }
 
-  const { plateNumber, plateState, confidence } = plateResult;
-  console.log(`Detected plate: ${plateNumber} (${plateState || 'unknown state'})`);
+  const plateNumber = analysis.plateNumber;
+  const plateState = analysis.plateState || undefined;
+  const confidence = analysis.plateConfidence;
+
+  console.log(`Detected plate: ${plateNumber} (${plateState || 'unknown state'}) - Confidence: ${confidence}%`);
 
   // Step 2: Check ICE database (PRIORITY #1)
   const iceLookup = await iceLookupService.lookupPlate(plateNumber);
@@ -126,28 +131,11 @@ async function processImage(record: S3EventRecord): Promise<void> {
     return;
   }
 
-  // Step 3: Not in ICE database - perform full analysis
-  console.log('Plate not in ICE database - performing full vehicle analysis');
+  // Step 3: Not in ICE database - use vehicle analysis from Bedrock
+  // (We already have it from the initial Bedrock call that extracted the plate)
+  console.log('Plate not in ICE database - using vehicle analysis from Bedrock');
 
-  // Check if AI analysis is enabled
-  const aiAnalysisEnabled = process.env.ENABLE_AI_ANALYSIS === 'true';
-
-  let vehicleAnalysis;
-  if (aiAnalysisEnabled) {
-    vehicleAnalysis = await bedrockService.classifyVehicle(bucketName, s3Key);
-  } else {
-    // Skip Bedrock analysis (cost savings mode)
-    console.log('AI analysis disabled - using default values');
-    vehicleAnalysis = {
-      vehicleType: 'unknown',
-      tintLevel: 'none' as const,
-      occupantCount: 0,
-      hasFaceMasks: false,
-      hasTacticalGear: false,
-      confidence: 0,
-      rawBedrockData: {},
-    };
-  }
+  const vehicleAnalysis = analysis;
 
   // Get vehicle record
   const vehicle = await dynamoDBService.getOrCreateVehicle(plateNumber, plateState);

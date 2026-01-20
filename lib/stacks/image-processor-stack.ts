@@ -51,14 +51,8 @@ export class ImageProcessorStack extends cdk.Stack {
     props.sightingsTable.grantReadWriteData(this.imageProcessorFunction);
     props.vehiclesTable.grantReadWriteData(this.imageProcessorFunction);
 
-    // Grant Textract permissions
-    this.imageProcessorFunction.addToRolePolicy(new iam.PolicyStatement({
-      actions: [
-        'textract:DetectDocumentText',
-        'textract:AnalyzeDocument',
-      ],
-      resources: ['*'],
-    }));
+    // NOTE: Textract permissions removed - we now use Bedrock for license plate extraction
+    // This saves ~$135/month and is more accurate!
 
     // Grant Bedrock permissions (for inference profiles and models)
     this.imageProcessorFunction.addToRolePolicy(new iam.PolicyStatement({

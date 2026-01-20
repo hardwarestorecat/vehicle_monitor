@@ -15,31 +15,46 @@ export class BedrockService {
   }
 
   /**
-   * Classify vehicle using Bedrock (Claude Haiku)
+   * Extract license plate AND classify vehicle using Bedrock (Claude Haiku)
+   * This replaces both Textract and vehicle classification in a single call
    */
   async classifyVehicle(bucketName: string, s3Key: string): Promise<VehicleAnalysis> {
-    console.log('Classifying vehicle with Bedrock...');
+    console.log('Analyzing image with Bedrock (license plate + vehicle details)...');
     const startTime = Date.now();
 
     try {
       // Get image from S3
       const imageBytes = await this.getImageFromS3(bucketName, s3Key);
 
-      // Prepare prompt for Claude
-      const prompt = `You are analyzing a vehicle image from a security camera for threat assessment.
+      // Prepare comprehensive prompt for Claude
+      const prompt = `You are analyzing a vehicle image from a security camera. Extract the license plate AND analyze the vehicle.
 
 Analyze this image and provide the following information in JSON format:
 
 {
-  "vehicleType": "sedan|suv|truck|van|crossover|motorcycle|other",
-  "tintLevel": "none|light|moderate|heavy",
-  "occupantCount": <number of visible occupants>,
-  "hasFaceMasks": <true if any occupants wearing face masks/gators/balaclavas>,
-  "hasTacticalGear": <true if tactical vests, body armor, helmets, or military-style equipment visible>,
-  "confidence": <0-100, your confidence in this assessment>
+  "licensePlate": {
+    "plateNumber": "<the license plate text, uppercase, no spaces or dashes>",
+    "state": "<2-letter state code if visible, or null>",
+    "confidence": <0-100, your confidence in the plate reading>
+  },
+  "vehicle": {
+    "vehicleType": "sedan|suv|truck|van|crossover|motorcycle|other",
+    "tintLevel": "none|light|moderate|heavy",
+    "occupantCount": <number of visible occupants>,
+    "hasFaceMasks": <true if any occupants wearing face masks/gators/balaclavas>,
+    "hasTacticalGear": <true if tactical vests, body armor, helmets, or military-style equipment visible>,
+    "confidence": <0-100, your confidence in this vehicle assessment>
+  }
 }
 
-IMPORTANT:
+IMPORTANT LICENSE PLATE EXTRACTION:
+- Look carefully for license plates on the front, rear, or side of the vehicle
+- Extract the exact text/numbers from the plate
+- Remove any spaces, dashes, or special characters (e.g., "ABC-123" becomes "ABC123")
+- If you can see the state abbreviation or state name on the plate, include it
+- If no license plate is visible, set plateNumber to null
+
+IMPORTANT VEHICLE ANALYSIS:
 - Be very careful with tactical gear detection - only mark true if you see actual tactical vests, body armor, helmets, or military-style equipment
 - Face masks include medical masks, gators, balaclavas, or any face coverings
 - Count ALL visible occupants, even if partially visible
@@ -88,28 +103,48 @@ Respond ONLY with valid JSON, no other text.`;
       const analysisText = responseBody.content[0].text;
       const analysis = JSON.parse(analysisText);
 
-      console.log('Vehicle analysis:', {
-        type: analysis.vehicleType,
-        tint: analysis.tintLevel,
-        occupants: analysis.occupantCount,
-        faceMasks: analysis.hasFaceMasks,
-        tacticalGear: analysis.hasTacticalGear,
-        confidence: analysis.confidence,
+      // Extract license plate info
+      const licensePlate = analysis.licensePlate || {};
+      const plateNumber = licensePlate.plateNumber;
+      const plateState = licensePlate.state;
+      const plateConfidence = licensePlate.confidence || 0;
+
+      // Extract vehicle info
+      const vehicle = analysis.vehicle || {};
+
+      console.log('Bedrock extraction results:');
+      console.log(`  License Plate: ${plateNumber || 'NOT DETECTED'} (${plateState || 'unknown state'}) - Confidence: ${plateConfidence}%`);
+      console.log('  Vehicle analysis:', {
+        type: vehicle.vehicleType,
+        tint: vehicle.tintLevel,
+        occupants: vehicle.occupantCount,
+        faceMasks: vehicle.hasFaceMasks,
+        tacticalGear: vehicle.hasTacticalGear,
+        confidence: vehicle.confidence,
       });
 
       return {
-        vehicleType: analysis.vehicleType || 'unknown',
-        tintLevel: analysis.tintLevel || 'none',
-        occupantCount: analysis.occupantCount || 0,
-        hasFaceMasks: analysis.hasFaceMasks || false,
-        hasTacticalGear: analysis.hasTacticalGear || false,
-        confidence: analysis.confidence || 0,
+        // License plate data
+        plateNumber: plateNumber ? plateNumber.toUpperCase().replace(/[^A-Z0-9]/g, '') : null,
+        plateState: plateState ? plateState.toUpperCase() : null,
+        plateConfidence: plateConfidence,
+
+        // Vehicle data
+        vehicleType: vehicle.vehicleType || 'unknown',
+        tintLevel: vehicle.tintLevel || 'none',
+        occupantCount: vehicle.occupantCount || 0,
+        hasFaceMasks: vehicle.hasFaceMasks || false,
+        hasTacticalGear: vehicle.hasTacticalGear || false,
+        confidence: vehicle.confidence || 0,
         rawBedrockData: responseBody,
       };
     } catch (error) {
-      console.error('Error classifying vehicle with Bedrock:', error);
-      // Return default analysis on error (don't fail the entire pipeline)
+      console.error('Error analyzing with Bedrock:', error);
+      // Return default analysis with no plate detected (don't fail the entire pipeline)
       return {
+        plateNumber: null,
+        plateState: null,
+        plateConfidence: 0,
         vehicleType: 'unknown',
         tintLevel: 'none',
         occupantCount: 0,
