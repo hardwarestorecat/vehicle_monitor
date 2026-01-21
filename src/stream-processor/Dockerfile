@@ -3,7 +3,7 @@ FROM python:3.11-slim
 # Install system dependencies for OpenCV
 RUN apt-get update && apt-get install -y \
     libopencv-dev \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
@@ -16,10 +16,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download YOLOv8-nano model at build time (6.2MB)
-RUN python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
-
 # Copy application code
+# Note: YOLOv8 model will be downloaded on first run (6.2MB)
 COPY stream_processor.py .
 
 # Set environment variables (can be overridden at runtime)

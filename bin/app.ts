@@ -60,16 +60,16 @@ alertStack.addDependency(networkStack);
 alertStack.addDependency(storageStack);
 
 // Phase 4: Stream Capture (deploy when cameras arrive)
-// const streamProcessorStack = new StreamProcessorStack(app, 'VehicleMonitoringStreamProcessorStack', {
-//   env,
-//   description: 'ECS tasks for RTSP stream capture and motion detection',
-//   vpc: networkStack.vpc,
-//   bucket: storageStack.bucket,
-//   cameraCredentialsSecret: storageStack.cameraCredentialsSecret,
-// });
-//
-// streamProcessorStack.addDependency(networkStack);
-// streamProcessorStack.addDependency(storageStack);
+const streamProcessorStack = new StreamProcessorStack(app, 'VehicleMonitoringStreamProcessorStack', {
+  env,
+  description: 'ECS tasks for RTSP stream capture and motion detection',
+  vpc: networkStack.vpc,
+  bucket: storageStack.bucket,
+  cameraCredentialsSecret: storageStack.cameraCredentialsSecret,
+});
+
+streamProcessorStack.addDependency(networkStack);
+streamProcessorStack.addDependency(storageStack);
 
 // Phase 5: Monitoring
 const monitoringStack = new MonitoringStack(app, 'VehicleMonitoringMonitoringStack', {

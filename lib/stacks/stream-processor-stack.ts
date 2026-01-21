@@ -39,21 +39,22 @@ export class StreamProcessorStack extends cdk.Stack {
       cpu: APP_CONFIG.ecs.streamProcessor.cpu,
     });
 
-    // Container Definition (placeholder - will be built and pushed later)
+    // Container Definition
     const container = taskDefinition.addContainer('StreamProcessorContainer', {
-      image: ecs.ContainerImage.fromRegistry('public.ecr.aws/docker/library/node:20-alpine'),
+      image: ecs.ContainerImage.fromEcrRepository(repository, 'latest'),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'stream-processor',
         logRetention: logs.RetentionDays.ONE_WEEK,
       }),
       environment: {
+        CAMERA_ID: 'camera1', // Will be parameterized when multiple cameras are added
+        AWS_REGION: APP_CONFIG.region,
         BUCKET_NAME: props.bucket.bucketName,
         S3_PREFIX: APP_CONFIG.s3Prefixes.incoming,
       },
       secrets: {
         CAMERA_CREDENTIALS: ecs.Secret.fromSecretsManager(props.cameraCredentialsSecret),
       },
-      command: ['sh', '-c', 'echo "Stream processor placeholder - build Docker image first" && sleep 3600'],
     });
 
     // Grant S3 permissions
@@ -62,11 +63,11 @@ export class StreamProcessorStack extends cdk.Stack {
     // Grant Secrets Manager permissions
     props.cameraCredentialsSecret.grantRead(taskDefinition.taskRole);
 
-    // Fargate Service (will deploy when cameras arrive)
+    // Fargate Service
     this.streamProcessorService = new ecs.FargateService(this, 'StreamProcessorService', {
       cluster,
       taskDefinition,
-      desiredCount: 0, // Start with 0 until cameras are ready
+      desiredCount: 1, // Start 1 task (configure camera URLs in Secrets Manager)
       capacityProviderStrategies: [
         {
           capacityProvider: 'FARGATE_SPOT',
