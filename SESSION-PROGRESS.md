@@ -1,18 +1,81 @@
 # Session Progress - Vehicle Monitoring System
-**Last Updated:** 2026-01-20 (23:30)
+**Last Updated:** 2026-01-21 (01:08 AM)
 **Commit:** TBD
 
 ---
 
-## 🎯 **Current Status: Stream Processor Deployed and Running! 🚀**
+## 🎯 **Current Status: Signal Integration In Progress**
 
-The stream processor is now fully deployed and running in AWS Fargate. Docker image built successfully via CodeBuild and pushed to ECR (4.8GB). ECS service started with 1 task.
+Stream processor deployed and stopped (waiting for cameras). Working on Signal API Lambda containerization - **blocked on signal-cli download URL issue**.
 
-**Next step:** Configure camera RTSP URLs in Secrets Manager to connect to actual cameras.
+### **Current Blocker:**
+- signal-cli versions 0.13.9 and 0.13.22 both return 404 from GitHub releases
+- Need to find correct version/filename format
+- 2 CodeBuild attempts failed at download step (~$0.10 spent, within free tier)
+
+**Resume point:** Fix signal-cli download URL in Dockerfile, then rebuild
 
 ---
 
-## ✅ **Latest Session Progress (2026-01-20 Late Evening)**
+## 🚧 **Signal Integration Work (2026-01-21 Early Morning - IN PROGRESS)**
+
+### **1. Created Signal Lambda Container Infrastructure**
+**Status:** ⏳ IN PROGRESS (blocked on signal-cli download)
+
+**Files created:**
+- `src/signal-api/Dockerfile` - Lambda container with Java 17 + signal-cli
+- `src/signal-api/handler.py` - Lambda handler for sending Signal messages
+- `src/signal-api/requirements.txt` - Python dependencies (boto3)
+- `src/signal-api/buildspec.yml` - CodeBuild instructions
+- `scripts/register-signal-account.sh` - Helper script for Signal account registration
+
+**Features implemented in handler.py:**
+- ✅ Send formatted alert messages to Signal groups
+- ✅ Extract group ID from Signal group URL
+- ✅ Registration actions (register, verify, joinGroup, test)
+- ✅ Format alert data into readable messages (plate, location, risk score, etc.)
+- ✅ Pull Signal credentials from Secrets Manager
+
+### **2. Updated AlertStack**
+**Status:** ✅ COMPLETED (ECR repo created, Lambda pending image)
+
+**Changes:**
+- Replaced inline Python code with `DockerImageFunction`
+- Created ECR repository: `770171147232.dkr.ecr.us-east-2.amazonaws.com/vehicle-monitoring-signal-api`
+- Increased memory to 1GB (for Java + signal-cli)
+- Increased timeout to 60s (for signal-cli operations)
+- Removed `AWS_DEFAULT_REGION` env var (Lambda provides this automatically)
+
+**Stack partially deployed - waiting for Docker image to complete**
+
+### **3. CodeBuild Setup for Signal API**
+**Status:** ⏳ IN PROGRESS (debugging signal-cli download)
+
+**CodeBuild project created:** `vehicle-monitoring-signal-api-build`
+
+**Build attempts:**
+1. **Attempt 1:** Failed - signal-cli v0.13.9 not found (404)
+2. **Attempt 2:** Failed - signal-cli v0.13.22 not found (404)
+
+**Blocker:** GitHub releases API returns v0.13.22 as latest, but download URL returns 404. Possible causes:
+- Filename format might be different (e.g., `signal-cli-0.13.22.tar.gz` instead of `signal-cli-0.13.22-Linux.tar.gz`)
+- Release might use different asset naming
+- Need to check actual GitHub releases page HTML to find correct URL
+
+**Cost so far:** ~$0.10 (within 100 min/month free tier)
+
+### **4. Control Scripts Created**
+**Status:** ✅ COMPLETED
+
+- `scripts/start-stream-processor.sh` - Start ECS service
+- `scripts/stop-stream-processor.sh` - Stop ECS service (USED - service now stopped)
+- `scripts/register-signal-account.sh` - Register Signal account with signal-cli
+
+**Stream processor service stopped to save $2.70/month until cameras arrive**
+
+---
+
+## ✅ **Previous Session: Stream Processor (2026-01-20 Late Evening)**
 
 ### **1. YOLO Detection Testing**
 **Status:** ✅ COMPLETED

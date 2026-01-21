@@ -4,6 +4,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as efs from 'aws-cdk-lib/aws-efs';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 import { Construct } from 'constructs';
 import { APP_CONFIG } from '../config/constants';
 import * as path from 'path';
@@ -22,6 +23,13 @@ export class AlertStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AlertStackProps) {
     super(scope, id, props);
 
+    // ECR Repository for Signal Lambda image
+    const repository = new ecr.Repository(this, 'SignalApiRepo', {
+      repositoryName: 'vehicle-monitoring-signal-api',
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      imageScanOnPush: true,
+    });
+
     // EFS Access Point for Signal data
     const accessPoint = new efs.AccessPoint(this, 'SignalDataAccessPoint', {
       fileSystem: props.fileSystem,
@@ -37,54 +45,13 @@ export class AlertStack extends cdk.Stack {
       },
     });
 
-    // Lambda function for Signal API
-    this.signalApiFunction = new lambda.Function(this, 'SignalApiFunction', {
-      runtime: lambda.Runtime.PYTHON_3_11,
-      handler: 'index.handler',
-      code: lambda.Code.fromInline(`
-import json
-import os
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-def handler(event, context):
-    """
-    Signal API Lambda function
-    TODO: Implement actual Signal CLI integration
-    For now, logs the alert message
-    """
-    logger.info("Signal API Lambda invoked")
-    logger.info(f"Event: {json.dumps(event)}")
-
-    try:
-        # Parse request body
-        body = json.loads(event.get('body', '{}'))
-
-        # Log the alert (placeholder for actual Signal sending)
-        logger.info(f"Would send Signal alert: {json.dumps(body, indent=2)}")
-
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps({
-                'success': True,
-                'message': 'Alert logged (Signal integration pending)',
-                'data': body
-            })
-        }
-    except Exception as e:
-        logger.error(f"Error: {str(e)}")
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(e)})
-        }
-`),
-      memorySize: 512,
-      timeout: cdk.Duration.seconds(30),
+    // Lambda function for Signal API (using container image)
+    this.signalApiFunction = new lambda.DockerImageFunction(this, 'SignalApiFunction', {
+      code: lambda.DockerImageCode.fromEcr(repository, {
+        tagOrDigest: 'latest',
+      }),
+      memorySize: 1024, // 1GB for Java + signal-cli
+      timeout: cdk.Duration.seconds(60), // Increased for signal-cli operations
       vpc: props.vpc,
       vpcSubnets: {
         subnetType: ec2.SubnetType.PUBLIC,
@@ -119,6 +86,12 @@ def handler(event, context):
     });
 
     // Outputs
+    new cdk.CfnOutput(this, 'SignalApiRepoUri', {
+      value: repository.repositoryUri,
+      description: 'ECR repository URI for Signal API Lambda',
+      exportName: 'VehicleMonitoringSignalApiRepoUri',
+    });
+
     new cdk.CfnOutput(this, 'SignalApiFunctionUrl', {
       value: this.functionUrl.url,
       description: 'Signal API Lambda Function URL',
