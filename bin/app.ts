@@ -49,14 +49,12 @@ imageProcessorStack.addDependency(storageStack);
 // Phase 3: Signal Integration
 const alertStack = new AlertStack(app, 'VehicleMonitoringAlertStack', {
   env,
-  description: 'Signal API Lambda function for sending alerts',
-  vpc: networkStack.vpc,
-  fileSystem: storageStack.fileSystem,
+  description: 'Signal API Lambda function for sending alerts (no VPC)',
   signalCredentialsSecret: storageStack.signalCredentialsSecret,
-  lambdaSecurityGroup: networkStack.lambdaSecurityGroup,
+  bucket: storageStack.bucket,
+  notificationEmail: process.env.NOTIFICATION_EMAIL, // Set via environment variable
 });
 
-alertStack.addDependency(networkStack);
 alertStack.addDependency(storageStack);
 
 // Phase 4: Stream Capture (deploy when cameras arrive)

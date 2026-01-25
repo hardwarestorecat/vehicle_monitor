@@ -3,18 +3,139 @@ import os
 import subprocess
 import logging
 import boto3
+import tarfile
+import tempfile
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+# Find and set JAVA_HOME if not already set
+if 'JAVA_HOME' not in os.environ:
+    try:
+        # Try to find java binary and set JAVA_HOME
+        java_path = subprocess.check_output(['bash', '-c', 'type -p java'], text=True).strip()
+        if java_path:
+            # Get the directory containing java binary, then go up one level
+            java_home = os.path.dirname(os.path.dirname(os.path.realpath(java_path)))
+            os.environ['JAVA_HOME'] = java_home
+            logger.info(f"Set JAVA_HOME to: {java_home}")
+    except Exception as e:
+        logger.warning(f"Could not set JAVA_HOME: {e}")
+
 # Environment variables
-SIGNAL_CLI_CONFIG_DIR = os.environ.get('SIGNAL_CLI_CONFIG_DIR', '/mnt/efs/signal-cli')
+SIGNAL_CLI_CONFIG_DIR = os.environ.get('SIGNAL_CLI_CONFIG_DIR', '/tmp/signal-cli')
 SIGNAL_CREDENTIALS_SECRET = os.environ['SIGNAL_CREDENTIALS_SECRET']
+SIGNAL_CREDENTIALS_S3_BUCKET = os.environ.get('SIGNAL_CREDENTIALS_S3_BUCKET')
+SIGNAL_CREDENTIALS_S3_KEY = os.environ.get('SIGNAL_CREDENTIALS_S3_KEY', 'signal-cli/credentials.tar.gz')
+SESSION_EXPIRY_SNS_TOPIC = os.environ.get('SESSION_EXPIRY_SNS_TOPIC')
 AWS_REGION = os.environ.get('AWS_REGION', 'us-east-2')
 
 # AWS clients
 secrets_client = boto3.client('secretsmanager', region_name=AWS_REGION)
+s3_client = boto3.client('s3', region_name=AWS_REGION)
+sns_client = boto3.client('sns', region_name=AWS_REGION)
+
+# Flag to track if credentials have been loaded in this container
+_credentials_loaded = False
+
+
+def download_signal_credentials():
+    """Download and extract Signal credentials from S3 to /tmp"""
+    global _credentials_loaded
+
+    if _credentials_loaded:
+        logger.info("Signal credentials already loaded in this container")
+        return
+
+    if not SIGNAL_CREDENTIALS_S3_BUCKET:
+        logger.warning("No S3 bucket configured for Signal credentials")
+        return
+
+    try:
+        logger.info(f"Downloading Signal credentials from s3://{SIGNAL_CREDENTIALS_S3_BUCKET}/{SIGNAL_CREDENTIALS_S3_KEY}")
+
+        # Create config directory
+        os.makedirs(SIGNAL_CLI_CONFIG_DIR, exist_ok=True)
+
+        # Download tar.gz to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.tar.gz') as tmp_file:
+            s3_client.download_fileobj(
+                SIGNAL_CREDENTIALS_S3_BUCKET,
+                SIGNAL_CREDENTIALS_S3_KEY,
+                tmp_file
+            )
+            tmp_file_path = tmp_file.name
+
+        # Extract to config directory
+        with tarfile.open(tmp_file_path, 'r:gz') as tar:
+            tar.extractall(path=SIGNAL_CLI_CONFIG_DIR)
+
+        # Clean up temp file
+        os.unlink(tmp_file_path)
+
+        logger.info(f"Signal credentials extracted to {SIGNAL_CLI_CONFIG_DIR}")
+        _credentials_loaded = True
+
+    except s3_client.exceptions.NoSuchKey:
+        logger.error(f"Signal credentials not found in S3: {SIGNAL_CREDENTIALS_S3_KEY}")
+        logger.error("Please register signal-cli and upload credentials to S3")
+    except Exception as e:
+        logger.error(f"Failed to download Signal credentials: {str(e)}")
+
+
+def send_session_expiry_notification(error_message: str):
+    """Send SNS notification when Signal session expires"""
+    if not SESSION_EXPIRY_SNS_TOPIC:
+        logger.warning("No SNS topic configured for session expiry notifications")
+        return
+
+    try:
+        subject = "🚨 Signal Session Expired - Re-registration Required"
+        message = f"""
+Signal session has expired for the Vehicle Monitoring System.
+
+Error: {error_message}
+
+ACTION REQUIRED:
+1. Run the re-registration script: ./scripts/reregister-signal.sh
+2. Follow the prompts to solve captcha and verify phone number
+3. Credentials will be automatically uploaded to S3
+
+The Signal integration will resume automatically once credentials are updated.
+
+Timestamp: {subprocess.check_output(['date'], text=True).strip()}
+        """
+
+        sns_client.publish(
+            TopicArn=SESSION_EXPIRY_SNS_TOPIC,
+            Subject=subject,
+            Message=message
+        )
+
+        logger.info("Session expiry notification sent via SNS")
+
+    except Exception as e:
+        logger.error(f"Failed to send SNS notification: {str(e)}")
+
+
+def check_for_session_error(stderr: str, stdout: str) -> bool:
+    """Check if error indicates session expiry"""
+    session_error_patterns = [
+        'not registered',
+        'registration required',
+        'Authorization failed',
+        'Invalid credentials',
+        'Account not found',
+        '401 Unauthorized',
+        '403 Forbidden'
+    ]
+
+    error_text = (stderr + stdout).lower()
+    for pattern in session_error_patterns:
+        if pattern.lower() in error_text:
+            return True
+    return False
 
 
 def get_signal_credentials() -> Dict[str, str]:
@@ -27,15 +148,30 @@ def get_signal_credentials() -> Dict[str, str]:
         raise
 
 
-def extract_group_id_from_url(group_url: str) -> Optional[str]:
+def get_group_id_from_credentials(credentials: Dict[str, str]) -> Optional[str]:
     """
-    Extract group ID from Signal group URL
-    Format: https://signal.group/#CjQKI...
-    The group ID is the base64 string after the #
+    Get the internal Signal group ID from credentials.
+    The groupId should be the 32-byte internal ID (base64-encoded, ~44 chars)
+    NOT the group URL hash which is 54 bytes and incompatible.
+
+    Returns the groupId if present, otherwise tries to extract from legacy groupUrl.
     """
+    # Prefer the direct groupId
+    if 'groupId' in credentials:
+        return credentials['groupId']
+
+    # Legacy fallback: extract from groupUrl (but this produces wrong format)
+    group_url = credentials.get('groupUrl')
     if not group_url or '#' not in group_url:
         return None
-    return group_url.split('#')[1]
+
+    logger.warning("Using legacy groupUrl - should use groupId instead!")
+    url_safe_b64 = group_url.split('#')[1]
+    standard_b64 = url_safe_b64.replace('-', '+').replace('_', '/')
+    padding = len(standard_b64) % 4
+    if padding:
+        standard_b64 += '=' * (4 - padding)
+    return standard_b64
 
 
 def format_alert_message(alert_data: Dict[str, Any]) -> str:
@@ -122,7 +258,7 @@ def send_signal_message(phone_number: str, recipient: str, message: str, is_grou
             cmd,
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=50
         )
 
         if result.returncode == 0:
@@ -133,6 +269,12 @@ def send_signal_message(phone_number: str, recipient: str, message: str, is_grou
             logger.error(f"signal-cli failed with code {result.returncode}")
             logger.error(f"stdout: {result.stdout}")
             logger.error(f"stderr: {result.stderr}")
+
+            # Check if this is a session expiry error
+            if check_for_session_error(result.stderr, result.stdout):
+                logger.error("Detected Signal session expiry")
+                send_session_expiry_notification(result.stderr)
+
             return False
 
     except subprocess.TimeoutExpired:
@@ -218,21 +360,19 @@ def handle_registration_action(action: str, phone_number: str, data: Dict[str, A
         elif action == 'test':
             # Send test message
             credentials = get_signal_credentials()
-            group_url = credentials.get('groupUrl')
+            group_id = get_group_id_from_credentials(credentials)
 
-            if group_url:
-                group_id = extract_group_id_from_url(group_url)
-                if group_id:
-                    success = send_signal_message(
-                        phone_number=phone_number,
-                        recipient=group_id,
-                        message="🧪 Test message from ICE Vehicle Monitoring System\n\nIf you see this, Signal integration is working!",
-                        is_group=True
-                    )
-                    return {
-                        'success': success,
-                        'message': 'Test message sent' if success else 'Failed to send test message'
-                    }
+            if group_id:
+                success = send_signal_message(
+                    phone_number=phone_number,
+                    recipient=group_id,
+                    message="🧪 Test message from ICE Vehicle Monitoring System\n\nIf you see this, Signal integration is working!",
+                    is_group=True
+                )
+                return {
+                    'success': success,
+                    'message': 'Test message sent' if success else 'Failed to send test message'
+                }
 
             return {'success': False, 'message': 'No group configured'}
 
@@ -273,6 +413,9 @@ def lambda_handler(event, context):
     logger.info(f"Event: {json.dumps(event)}")
 
     try:
+        # Download Signal credentials from S3 (if not already loaded)
+        download_signal_credentials()
+
         # Parse request body
         if 'body' in event:
             body = json.loads(event['body'])
@@ -303,7 +446,6 @@ def lambda_handler(event, context):
         # Get Signal credentials
         credentials = get_signal_credentials()
         phone_number = credentials.get('phoneNumber')
-        group_url = credentials.get('groupUrl')
 
         if not phone_number:
             raise ValueError("Phone number not found in credentials")
@@ -312,22 +454,19 @@ def lambda_handler(event, context):
         message = format_alert_message(body)
         logger.info(f"Formatted message:\n{message}")
 
-        # Send to group if we have a group URL
+        # Send to group if we have a group ID
         success = False
-        if group_url:
-            group_id = extract_group_id_from_url(group_url)
-            if group_id:
-                logger.info(f"Sending to Signal group")
-                success = send_signal_message(
-                    phone_number=phone_number,
-                    recipient=group_id,
-                    message=message,
-                    is_group=True
-                )
-            else:
-                logger.error("Failed to extract group ID from group URL")
+        group_id = get_group_id_from_credentials(credentials)
+        if group_id:
+            logger.info(f"Sending to Signal group")
+            success = send_signal_message(
+                phone_number=phone_number,
+                recipient=group_id,
+                message=message,
+                is_group=True
+            )
         else:
-            logger.warning("No group URL configured, message not sent")
+            logger.warning("No group ID configured, message not sent")
 
         # Return response
         if success:
